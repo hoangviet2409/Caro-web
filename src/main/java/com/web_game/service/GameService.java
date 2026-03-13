@@ -52,7 +52,6 @@ public class GameService {
         // Nếu đã có spectator với sessionId này, trả về SPECTATOR
         if (session.spectators.containsKey(sessionId))
             return "SPECTATOR";
-
         if (session.playerX_Id == null) {
             session.playerX_Id = sessionId;
             session.playerX_Name = username;
@@ -60,6 +59,7 @@ public class GameService {
             if (session.roomOwnerId == null) {
                 session.roomOwnerId = sessionId;
             }
+            broadcastLobbyUpdate();
             return "X";
         } else if (session.playerO_Id == null) {
             session.playerO_Id = sessionId;
