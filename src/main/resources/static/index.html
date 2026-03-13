@@ -1063,6 +1063,23 @@
                                 if (moveHistory.length > 0) {
                                     replayToMove(moveHistory.length - 1);
                                 }
+                                
+                                // Nếu ván đã kết thúc, khôi phục trạng thái thắng/thua
+                                if (state.gameOver) {
+                                    isGameOver = true;
+                                    if (state.winningLine) {
+                                        winningLine = state.winningLine;
+                                        setTimeout(() => highlightWinningLine(state.winningLine), 500);
+                                    }
+                                    const statusEl = document.getElementById("status");
+                                    if (state.winner) {
+                                        const isWinner = state.winner === myRole;
+                                        statusEl.textContent = isWinner ? "🎉 Bạn đã thắng!" : "😢 Bạn đã thua.";
+                                    } else {
+                                        statusEl.textContent = "🤝 Ván đấu kết thúc với tỉ số HÒA!";
+                                    }
+                                    document.getElementById("rematchArea").style.display = "block";
+                                }
                             }
                         }
 

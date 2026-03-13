@@ -44,14 +44,21 @@ public class GameService {
         GameSession session = activeGames.computeIfAbsent(roomId, k -> new GameSession());
 
         // Xử lý reconnect (người chơi cũ vào lại)
-        if (sessionId.equals(session.playerX_Id))
+        if (sessionId.equals(session.playerX_Id) || username.equals(session.playerX_Name)) {
+            session.playerX_Id = sessionId; // Cập nhật sessionId mới
             return "X";
-        if (sessionId.equals(session.playerO_Id))
+        }
+        if (sessionId.equals(session.playerO_Id) || username.equals(session.playerO_Name)) {
+            session.playerO_Id = sessionId; // Cập nhật sessionId mới
             return "O";
+        }
 
-        // Nếu đã có spectator với sessionId này, trả về SPECTATOR
-        if (session.spectators.containsKey(sessionId))
+        // Nếu đã có spectator với sessionId này hoặc username này, trả về SPECTATOR
+        if (session.spectators.containsKey(sessionId) || session.spectators.containsValue(username)) {
+            // Cập nhật sessionId cho spectator (nếu cần tìm kiếm ngược lại thì map cần đảo hoặc loop)
+            // Ở đây tạm thời return SPECTATOR luôn
             return "SPECTATOR";
+        }
         if (session.playerX_Id == null) {
             session.playerX_Id = sessionId;
             session.playerX_Name = username;
@@ -129,6 +136,11 @@ public class GameService {
             state.setTimeRemaining(TURN_TIME_LIMIT_SECONDS);
         }
 
+        if (winResult.isWin) {
+            session.lastWinnerRole = state.getWinner();
+        }
+
+
         // Lưu lịch sử nước đi
         session.moveHistory.add(new int[] { row, col, session.currentPlayer.equals("X") ? 1 : 2 });
 
@@ -140,6 +152,22 @@ public class GameService {
         GameSession session = activeGames.get(roomId);
         if (session == null)
             return;
+
+        if ("DRAW".equals(winnerRole)) {
+            // Xử lý Hòa: Có thể lưu lịch sử nhưng không cộng/trừ điểm
+            session.lastWinnerRole = null; // Reset winner cho ván sau
+            try {
+                MatchHistory match = new MatchHistory();
+                match.setRoomId(roomId);
+                match.setWinnerUsername("DRAW");
+                match.setWinnerRole("NONE");
+                match.setLoserUsername("DRAW");
+                match.setPlayedAt(LocalDateTime.now());
+                matchRepository.save(match);
+            } catch (Exception e) { e.printStackTrace(); }
+            broadcastLobbyUpdate();
+            return;
+        }
 
         String winnerName = winnerRole.equals("X") ? session.playerX_Name : session.playerO_Name;
         String loserName = winnerRole.equals("X") ? session.playerO_Name : session.playerX_Name;
@@ -189,6 +217,15 @@ public class GameService {
             newSession.roomOwnerId = oldSession.roomOwnerId;
             newSession.maxSpectators = oldSession.maxSpectators;
             newSession.spectators = oldSession.spectators;
+            newSession.lastWinnerRole = oldSession.lastWinnerRole;
+            
+            // Logic: Người thắng ván trước đi trước
+            if (oldSession.lastWinnerRole != null && (oldSession.lastWinnerRole.equals("X") || oldSession.lastWinnerRole.equals("O"))) {
+                newSession.currentPlayer = oldSession.lastWinnerRole;
+            } else {
+                newSession.currentPlayer = "X"; // Mặc định ván đầu hoặc hòa
+            }
+            
             newSession.turnStartTime = System.currentTimeMillis();
             newSession.lastMoveTime = System.currentTimeMillis();
             newSession.lastMoveTime = System.currentTimeMillis();
@@ -323,10 +360,20 @@ public class GameService {
         GameState state = new GameState();
         state.setPlayer(session.currentPlayer);
         state.setNextTurn(session.currentPlayer);
+        state.setGameOver(session.isGameOver);
         if (session.isGameOver) {
-            state.setWinner(session.winningLine != null ? session.currentPlayer : null);
+            state.setWinner(session.lastWinnerRole);
+            state.setWinningLine(session.winningLine);
         }
         state.setMoveHistory(new java.util.ArrayList<>(session.moveHistory));
+        state.setMoveNumber(session.moveCount);
+        
+        // Tính thời gian còn lại
+        if (session.turnStartTime > 0 && !session.isGameOver) {
+            long elapsed = (System.currentTimeMillis() - session.turnStartTime) / 1000;
+            state.setTimeRemaining(Math.max(0, TURN_TIME_LIMIT_SECONDS - (int) elapsed));
+        }
+        
         return state;
     }
 
@@ -453,15 +500,27 @@ public class GameService {
 
             processGameResult(roomId, winnerRole);
 
-            // Nếu cả 2 người đều không còn trong phòng -> xóa phòng
+            // Nếu cả 2 người đều không còn trong phòng -> đặt lịch xóa phòng sau 30s 
+            // Điều này giúp phòng không bị mất ngay khi người chơi F5 trang
             if (session.playerX_Id == null && session.playerO_Id == null) {
-                activeGames.remove(roomId);
+                scheduleRoomCleanup(roomId);
             }
 
             broadcastLobbyUpdate();
             return new DisconnectResult(roomId, state);
         }
         return null;
+    }
+
+    private void scheduleRoomCleanup(String roomId) {
+        scheduler.schedule(() -> {
+            GameSession session = activeGames.get(roomId);
+            if (session != null && session.playerX_Id == null && session.playerO_Id == null) {
+                activeGames.remove(roomId);
+                broadcastLobbyUpdate();
+                System.out.println("Cleaned up empty room: " + roomId);
+            }
+        }, 30, TimeUnit.SECONDS); 
     }
 
     // Check thắng thua và trả về đường thắng
@@ -615,6 +674,7 @@ public class GameService {
         long lastMoveTime = 0; // Thời gian nước đi cuối cùng (millis)
         String roomOwnerId = null; // SessionId của chủ phòng (người tạo phòng đầu tiên)
         int maxSpectators = 10; // Giới hạn số spectator
+        String lastWinnerRole = null; // Vai thắng ván trước
     }
 
     // --- BROADCAST LOBBY UPDATE ---

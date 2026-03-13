@@ -18,4 +18,5 @@ public class GameState {
     private String endReason; // Lý do kết thúc (VD: OPPONENT_LEFT, NORMAL, TIME_OUT, AFK)
     private Integer timeRemaining; // Thời gian còn lại (giây) cho lượt hiện tại
     private java.util.List<int[]> moveHistory; // Lịch sử nước đi (để sync)
+    private boolean isGameOver; // Trạng thái ván đấu kết thúc chưa
 }
