@@ -57,7 +57,7 @@ public class SecurityConfig {
                 .httpBasic(basic -> basic.disable())
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/api/auth/**", "/ws-caro/**").permitAll()
+                        .requestMatchers("/api/auth/**", "/ws-caro/**", "/error").permitAll()
                         .requestMatchers("/", "/index.html", "/login.html", "/lobby.html", "/profile.html",
                                 "/home.html", "/match-history.html",
                                 "/*.css", "/*.js", "/favicon.ico", "/**/*.html", "/**/*.png", "/**/*.jpg", "/**/*.jpeg",
