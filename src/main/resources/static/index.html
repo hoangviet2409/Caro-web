@@ -1,0 +1,1416 @@
+<!DOCTYPE html>
+<html lang="vi">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ván chơi - Cờ Caro Online Pro</title>
+    <script>
+        if (!localStorage.getItem("token")) window.location.href = "/login.html";
+    </script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/sockjs-client/1.5.1/sockjs.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/stomp.js/2.3.3/stomp.min.js"></script>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            margin: 0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #1f2933;
+            color: #f9fafb;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        header {
+            padding: 15px 30px;
+            background: #111827;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
+        }
+
+        .brand {
+            font-size: 20px;
+            font-weight: 700;
+        }
+
+        .brand span {
+            color: #facc15;
+        }
+
+        .header-actions {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 13px;
+        }
+
+        .username-label {
+            margin-right: 8px;
+        }
+
+        .btn {
+            border: none;
+            border-radius: 999px;
+            padding: 8px 16px;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            transition: all 0.15s ease;
+            text-decoration: none;
+        }
+
+        .btn-primary {
+            background: #2563eb;
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: #1d4ed8;
+        }
+
+        .btn-secondary {
+            background: #374151;
+            color: white;
+        }
+
+        .btn-secondary:hover {
+            background: #4b5563;
+        }
+
+        .btn-danger {
+            background: #dc2626;
+            color: white;
+        }
+
+        .btn-danger:hover {
+            background: #b91c1c;
+        }
+
+        .btn-success {
+            background: #16a34a;
+            color: white;
+        }
+
+        .btn-success:hover {
+            background: #15803d;
+        }
+
+        .btn-warning {
+            background: #f59e0b;
+            color: white;
+        }
+
+        .btn-warning:hover {
+            background: #d97706;
+        }
+
+        .page {
+            flex: 1;
+            display: flex;
+            padding: 20px;
+            gap: 20px;
+        }
+
+        .board-wrapper {
+            flex: 3;
+            background: #111827;
+            border-radius: 16px;
+            padding: 16px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.5);
+            display: flex;
+            flex-direction: column;
+        }
+
+        .board-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+        }
+
+        .board-title span {
+            color: #fbbf24;
+        }
+
+        .room-tag {
+            font-size: 12px;
+            padding: 4px 10px;
+            border-radius: 999px;
+            background: #020617;
+            border: 1px solid #374151;
+            color: #9ca3af;
+        }
+
+        #board {
+            flex: 1;
+            margin-top: 8px;
+            display: grid;
+            grid-template-columns: repeat(15, minmax(0, 1fr));
+            grid-template-rows: repeat(15, minmax(0, 1fr));
+            gap: 1px;
+            background: #9a4a0a;
+            border-radius: 12px;
+            overflow: hidden;
+            aspect-ratio: 1;
+        }
+
+        .cell {
+            background: #f97316;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            position: relative;
+            transition: background 0.1s ease, transform 0.1s ease;
+        }
+
+        .cell:hover:not(.x):not(.o) {
+            background: #fb923c;
+            transform: scale(1.05);
+        }
+
+        .cell.x::after,
+        .cell.o::after {
+            content: '';
+            width: 70%;
+            height: 70%;
+            border-radius: 999px;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.5);
+            animation: placePiece 0.2s ease;
+        }
+
+        @keyframes placePiece {
+            from {
+                transform: scale(0);
+            }
+
+            to {
+                transform: scale(1);
+            }
+        }
+
+        .cell.x::after {
+            background: radial-gradient(circle at 30% 30%, #6b7280, #111827);
+        }
+
+        .cell.o::after {
+            background: radial-gradient(circle at 30% 30%, #f9fafb, #9ca3af);
+        }
+
+        .cell.winning {
+            background: #fbbf24 !important;
+            animation: pulseWin 1s infinite;
+        }
+
+        @keyframes pulseWin {
+
+            0%,
+            100% {
+                box-shadow: 0 0 0 0 rgba(251, 191, 36, 0.7);
+            }
+
+            50% {
+                box-shadow: 0 0 0 8px rgba(251, 191, 36, 0);
+            }
+        }
+
+        .cell.disabled {
+            cursor: not-allowed;
+            opacity: 0.5;
+        }
+
+        .side-panel {
+            flex: 2;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        .card {
+            background: #111827;
+            border-radius: 16px;
+            padding: 16px;
+            box-shadow: 0 12px 24px rgba(0, 0, 0, 0.4);
+        }
+
+        .card-title {
+            font-size: 14px;
+            font-weight: 600;
+            margin-bottom: 8px;
+            color: #e5e7eb;
+        }
+
+        .status-text {
+            font-size: 14px;
+            font-weight: 600;
+            color: #fbbf24;
+            margin-bottom: 8px;
+            min-height: 20px;
+        }
+
+        .timer-display {
+            font-size: 18px;
+            font-weight: 700;
+            color: #fbbf24;
+            text-align: center;
+            padding: 8px;
+            background: #020617;
+            border-radius: 8px;
+            margin-bottom: 8px;
+        }
+
+        .timer-display.warning {
+            color: #ef4444;
+            animation: pulse 1s infinite;
+        }
+
+        @keyframes pulse {
+
+            0%,
+            100% {
+                opacity: 1;
+            }
+
+            50% {
+                opacity: 0.5;
+            }
+        }
+
+        .spectator-list {
+            max-height: 150px;
+            overflow-y: auto;
+            background: #020617;
+            border-radius: 8px;
+            padding: 8px;
+            margin-top: 8px;
+            font-size: 12px;
+        }
+
+        .spectator-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 4px 8px;
+            margin-bottom: 4px;
+            background: #1f2933;
+            border-radius: 6px;
+        }
+
+        .kick-btn {
+            padding: 4px 8px;
+            font-size: 10px;
+            background: #dc2626;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+
+        .kick-btn:hover {
+            background: #b91c1c;
+        }
+
+        .room-input-row {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 8px;
+        }
+
+        .room-input-row input {
+            flex: 1;
+            padding: 8px 10px;
+            border-radius: 999px;
+            border: 1px solid #374151;
+            background: #020617;
+            color: #f9fafb;
+            font-size: 13px;
+        }
+
+        .room-input-row input:focus {
+            outline: none;
+            border-color: #2563eb;
+        }
+
+        .btn-full {
+            width: 100%;
+            margin-top: 8px;
+        }
+
+        .btn-full[disabled] {
+            opacity: 0.4;
+            cursor: not-allowed;
+        }
+
+        .action-buttons {
+            display: flex;
+            gap: 8px;
+            margin-top: 8px;
+        }
+
+        .action-buttons .btn {
+            flex: 1;
+        }
+
+        #chatBox {
+            height: 200px;
+            overflow-y: auto;
+            background: #020617;
+            border-radius: 12px;
+            padding: 10px;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .chat-message {
+            max-width: 80%;
+            padding: 6px 10px;
+            border-radius: 10px;
+            font-size: 12px;
+        }
+
+        .chat-message.me {
+            align-self: flex-end;
+            background: #2563eb;
+        }
+
+        .chat-message.other {
+            align-self: flex-start;
+            background: #374151;
+        }
+
+        .chat-meta {
+            font-weight: 600;
+            margin-bottom: 2px;
+        }
+
+        .chat-input-row {
+            display: flex;
+            gap: 8px;
+            margin-top: 8px;
+        }
+
+        .chat-input-row input {
+            flex: 1;
+            padding: 8px 10px;
+            border-radius: 999px;
+            border: 1px solid #374151;
+            background: #020617;
+            color: #f9fafb;
+            font-size: 13px;
+        }
+
+        .chat-input-row input:focus {
+            outline: none;
+            border-color: #2563eb;
+        }
+
+        .move-list {
+            max-height: 200px;
+            overflow-y: auto;
+            background: #020617;
+            border-radius: 12px;
+            padding: 10px;
+        }
+
+        .move-item {
+            padding: 6px 10px;
+            margin-bottom: 4px;
+            border-radius: 8px;
+            background: #1f2933;
+            font-size: 12px;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .move-item:hover {
+            background: #374151;
+        }
+
+        .move-item.active {
+            background: #2563eb;
+            font-weight: 600;
+        }
+
+        #leaderboardModal {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(15, 23, 42, 0.8);
+            justify-content: center;
+            align-items: center;
+            z-index: 50;
+        }
+
+        .leaderboard-content {
+            background: #111827;
+            border-radius: 16px;
+            padding: 20px;
+            max-width: 600px;
+            width: 90%;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.7);
+        }
+
+        .leaderboard-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+
+        .leaderboard-title {
+            font-size: 18px;
+            font-weight: 600;
+        }
+
+        .leaderboard-close {
+            cursor: pointer;
+            font-size: 20px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 10px;
+            font-size: 13px;
+        }
+
+        th,
+        td {
+            padding: 8px;
+            text-align: center;
+        }
+
+        th {
+            background: #020617;
+            color: #e5e7eb;
+            position: sticky;
+            top: 0;
+        }
+
+        tr:nth-child(even) td {
+            background: #020617;
+        }
+
+        tr:nth-child(odd) td {
+            background: #020617;
+        }
+
+        .top1 {
+            color: #fbbf24;
+            font-weight: 700;
+        }
+
+        .top2 {
+            color: #e5e7eb;
+            font-weight: 600;
+        }
+
+        .top3 {
+            color: #9ca3af;
+            font-weight: 600;
+        }
+
+        .rematch-notification {
+            background: #fbbf24;
+            color: #111827;
+            padding: 10px;
+            border-radius: 8px;
+            margin-top: 8px;
+            font-size: 13px;
+            text-align: center;
+        }
+
+        #settingsModal {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(15, 23, 42, 0.8);
+            justify-content: center;
+            align-items: center;
+            z-index: 50;
+        }
+
+        .settings-content {
+            background: #111827;
+            border-radius: 16px;
+            padding: 20px;
+            max-width: 500px;
+            width: 90%;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.7);
+        }
+
+        .settings-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .settings-title {
+            font-size: 18px;
+            font-weight: 600;
+        }
+
+        .settings-close {
+            cursor: pointer;
+            font-size: 20px;
+        }
+
+        .setting-item {
+            margin-bottom: 20px;
+        }
+
+        .setting-label {
+            display: block;
+            margin-bottom: 8px;
+            font-size: 14px;
+            color: #e5e7eb;
+        }
+
+        .setting-control {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+
+        .toggle-switch {
+            position: relative;
+            width: 50px;
+            height: 24px;
+            background: #374151;
+            border-radius: 12px;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+
+        .toggle-switch.active {
+            background: #2563eb;
+        }
+
+        .toggle-switch::after {
+            content: '';
+            position: absolute;
+            width: 20px;
+            height: 20px;
+            background: white;
+            border-radius: 50%;
+            top: 2px;
+            left: 2px;
+            transition: transform 0.3s;
+        }
+
+        .toggle-switch.active::after {
+            transform: translateX(26px);
+        }
+
+        .theme-select {
+            padding: 8px 12px;
+            border-radius: 8px;
+            border: 1px solid #374151;
+            background: #020617;
+            color: #f9fafb;
+            font-size: 14px;
+            width: 100%;
+        }
+
+        @media (max-width: 900px) {
+            .page {
+                flex-direction: column;
+            }
+
+            .board-wrapper {
+                order: 2;
+            }
+
+            .side-panel {
+                order: 1;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <header>
+        <div class="brand">Cờ Caro <span>Online Pro</span></div>
+        <div class="header-actions">
+            <div class="username-label">Xin chào, <span id="displayUser"></span></div>
+            <a href="/lobby.html" class="btn btn-secondary">🏠 Lobby</a>
+            <button class="btn btn-secondary" onclick="openSettings()">⚙️ Cài đặt</button>
+            <button class="btn btn-secondary" onclick="openLeaderboard()">🏆 Bảng xếp hạng</button>
+            <button class="btn btn-danger" onclick="logout()">Đăng xuất</button>
+        </div>
+    </header>
+
+    <main class="page">
+        <section class="board-wrapper">
+            <div class="board-header">
+                <div class="board-title">Phòng: <span id="roomLabel">Chưa chọn</span></div>
+                <div class="room-tag" id="roleLabel">Vai: ?</div>
+            </div>
+            <div id="board"></div>
+        </section>
+
+        <aside class="side-panel">
+            <div class="card">
+                <div class="card-title">Thông tin ván đấu</div>
+                <div id="status" class="status-text">Vui lòng nhập phòng hoặc chọn từ Lobby.</div>
+                <div id="timerDisplay" class="timer-display" style="display: none;"></div>
+                <div class="room-input-row">
+                    <input type="text" id="roomIdInput" placeholder="Mã phòng (VD: 123)">
+                    <button class="btn btn-primary" onclick="connectToRoom()">Vào</button>
+                </div>
+                <div class="action-buttons">
+                    <button id="btnReset" class="btn btn-secondary btn-full" onclick="resetGame()" disabled>Ván
+                        mới</button>
+                    <button id="btnDraw" class="btn btn-warning btn-full" onclick="requestDraw()" disabled>Cầu
+                        hòa</button>
+                    <button id="btnSurrender" class="btn btn-danger btn-full" onclick="surrender()" disabled>Đầu
+                        hàng</button>
+                    <button id="btnLeave" class="btn btn-danger btn-full" onclick="leaveRoom()">Rời phòng</button>
+                </div>
+                <div id="rematchArea" style="display: none;">
+                    <div class="rematch-notification" id="rematchStatus"></div>
+                    <button class="btn btn-success btn-full" onclick="requestRematch()" style="margin-top: 8px;">Chơi
+                        lại</button>
+                </div>
+            </div>
+
+            <div class="card" id="spectatorCard" style="display: none;">
+                <div class="card-title">Khán giả (<span id="spectatorCount">0</span>/10)</div>
+                <div id="spectatorList" class="spectator-list"></div>
+            </div>
+
+            <div class="card">
+                <div class="card-title">Lịch sử nước đi</div>
+                <div id="moveList" class="move-list"></div>
+            </div>
+
+            <div class="card">
+                <div class="card-title">Chat trong phòng</div>
+                <div id="chatBox"></div>
+                <div class="chat-input-row">
+                    <input type="text" id="chatInput" placeholder="Nhập tin nhắn..." onkeypress="handleChatKey(event)">
+                    <button class="btn btn-primary" onclick="sendChat()">Gửi</button>
+                </div>
+            </div>
+        </aside>
+    </main>
+
+    <div id="leaderboardModal">
+        <div class="leaderboard-content">
+            <div class="leaderboard-header">
+                <div class="leaderboard-title">🏆 TOP 10 CAO THỦ SERVER</div>
+                <div class="leaderboard-close" onclick="closeLeaderboard()">✕</div>
+            </div>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Hạng</th>
+                        <th>Người chơi</th>
+                        <th>Điểm ELO</th>
+                        <th>Thắng / Thua</th>
+                    </tr>
+                </thead>
+                <tbody id="rankBody"></tbody>
+            </table>
+        </div>
+    </div>
+
+    <div id="settingsModal">
+        <div class="settings-content">
+            <div class="settings-header">
+                <div class="settings-title">⚙️ Cài đặt</div>
+                <div class="settings-close" onclick="closeSettings()">✕</div>
+            </div>
+            <div class="setting-item">
+                <label class="setting-label">🔊 Bật âm thanh</label>
+                <div class="setting-control">
+                    <div class="toggle-switch" id="soundToggle" onclick="toggleSound()"></div>
+                    <span id="soundStatus">Tắt</span>
+                </div>
+            </div>
+            <div class="setting-item">
+                <label class="setting-label">🎨 Theme bàn cờ</label>
+                <select class="theme-select" id="boardTheme" onchange="changeBoardTheme()">
+                    <option value="classic">Cổ điển (Cam)</option>
+                    <option value="wood">Gỗ (Nâu)</option>
+                    <option value="modern">Hiện đại (Xám)</option>
+                </select>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = "";
+        document.getElementById("displayUser").textContent = localStorage.getItem("username") || "User";
+
+        const BOARD_SIZE = 15;
+        let stompClient = null;
+        let currentRoomId = null;
+        let myRole = null;
+        let isConnected = false;
+        let moveHistory = [];
+        let winningLine = null;
+        let isGameOver = false;
+        let soundEnabled = localStorage.getItem("soundEnabled") === "true";
+        let boardTheme = localStorage.getItem("boardTheme") || "classic";
+        let reconnectAttempts = 0;
+        let reconnectTimer = null;
+        const MAX_RECONNECT_ATTEMPTS = 5;
+        let currentSessionId = null;
+        let isRoomOwner = false;
+        let timerInterval = null;
+
+        function logout() {
+            localStorage.removeItem("token");
+            localStorage.removeItem("username");
+            window.location.href = "/login.html";
+        }
+
+        async function openLeaderboard() {
+            const modal = document.getElementById("leaderboardModal");
+            const tbody = document.getElementById("rankBody");
+            modal.style.display = "flex";
+            tbody.innerHTML = "";
+
+            const token = localStorage.getItem("token");
+            if (!token) {
+                tbody.innerHTML = "<tr><td colspan='4'>Bạn cần đăng nhập để xem bảng xếp hạng.</td></tr>";
+                return;
+            }
+
+            try {
+                const res = await fetch(API_BASE + "/api/users/leaderboard", {
+                    headers: { "Authorization": "Bearer " + token }
+                });
+                if (!res.ok) {
+                    tbody.innerHTML = "<tr><td colspan='4'>Không thể tải bảng xếp hạng.</td></tr>";
+                    return;
+                }
+                const data = await res.json();
+                if (!Array.isArray(data) || data.length === 0) {
+                    tbody.innerHTML = "<tr><td colspan='4'>Chưa có dữ liệu.</td></tr>";
+                    return;
+                }
+                data.forEach((user, index) => {
+                    const tr = document.createElement("tr");
+                    const rank = index + 1;
+                    if (rank === 1) tr.classList.add("top1");
+                    else if (rank === 2) tr.classList.add("top2");
+                    else if (rank === 3) tr.classList.add("top3");
+                    tr.innerHTML = `
+                    <td>${rank}</td>
+                    <td>${user.username}</td>
+                    <td>${user.score}</td>
+                    <td>${user.wins} / ${user.losses}</td>
+                `;
+                    tbody.appendChild(tr);
+                });
+            } catch (e) {
+                console.error(e);
+                tbody.innerHTML = "<tr><td colspan='4'>Lỗi kết nối server.</td></tr>";
+            }
+        }
+
+        function closeLeaderboard() {
+            document.getElementById("leaderboardModal").style.display = "none";
+        }
+
+        function openSettings() {
+            const modal = document.getElementById("settingsModal");
+            modal.style.display = "flex";
+            const soundToggle = document.getElementById("soundToggle");
+            const soundStatus = document.getElementById("soundStatus");
+            const boardThemeSelect = document.getElementById("boardTheme");
+
+            if (soundEnabled) {
+                soundToggle.classList.add("active");
+                soundStatus.textContent = "Bật";
+            } else {
+                soundToggle.classList.remove("active");
+                soundStatus.textContent = "Tắt";
+            }
+            boardThemeSelect.value = boardTheme;
+        }
+
+        function closeSettings() {
+            document.getElementById("settingsModal").style.display = "none";
+        }
+
+        function toggleSound() {
+            soundEnabled = !soundEnabled;
+            localStorage.setItem("soundEnabled", soundEnabled);
+            const soundToggle = document.getElementById("soundToggle");
+            const soundStatus = document.getElementById("soundStatus");
+            if (soundEnabled) {
+                soundToggle.classList.add("active");
+                soundStatus.textContent = "Bật";
+                playSound("click");
+            } else {
+                soundToggle.classList.remove("active");
+                soundStatus.textContent = "Tắt";
+            }
+        }
+
+        function changeBoardTheme() {
+            boardTheme = document.getElementById("boardTheme").value;
+            localStorage.setItem("boardTheme", boardTheme);
+            applyBoardTheme();
+            if (soundEnabled) playSound("click");
+        }
+
+        function handleReconnect() {
+            if (reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
+                document.getElementById("status").textContent = "❌ Không thể kết nối. Vui lòng tải lại trang.";
+                return;
+            }
+
+            reconnectAttempts++;
+            const statusEl = document.getElementById("status");
+            statusEl.textContent = `Đang thử kết nối lại... (${reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS})`;
+
+            reconnectTimer = setTimeout(() => {
+                if (currentRoomId && !isConnected) {
+                    connectToRoom();
+                }
+            }, 2000 * reconnectAttempts); // Exponential backoff
+        }
+
+        function applyBoardTheme() {
+            const board = document.getElementById("board");
+            const cells = board.querySelectorAll(".cell");
+
+            board.className = "";
+            cells.forEach(cell => {
+                cell.className = "cell";
+                if (cell.classList.contains("x") || cell.classList.contains("o")) {
+                    cell.classList.add(cell.classList.contains("x") ? "x" : "o");
+                }
+            });
+
+            if (boardTheme === "classic") {
+                board.style.background = "#9a4a0a";
+                cells.forEach(cell => {
+                    if (!cell.classList.contains("x") && !cell.classList.contains("o")) {
+                        cell.style.background = "#f97316";
+                    }
+                });
+            } else if (boardTheme === "wood") {
+                board.style.background = "#8b4513";
+                cells.forEach(cell => {
+                    if (!cell.classList.contains("x") && !cell.classList.contains("o")) {
+                        cell.style.background = "#d2691e";
+                    }
+                });
+            } else if (boardTheme === "modern") {
+                board.style.background = "#374151";
+                cells.forEach(cell => {
+                    if (!cell.classList.contains("x") && !cell.classList.contains("o")) {
+                        cell.style.background = "#4b5563";
+                    }
+                });
+            }
+        }
+
+        function playSound(type) {
+            if (!soundEnabled) return;
+            const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            const oscillator = audioContext.createOscillator();
+            const gainNode = audioContext.createGain();
+
+            oscillator.connect(gainNode);
+            gainNode.connect(audioContext.destination);
+
+            if (type === "click") {
+                oscillator.frequency.value = 800;
+                oscillator.type = "sine";
+                gainNode.gain.setValueAtTime(0.1, audioContext.currentTime);
+                gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.1);
+            } else if (type === "win") {
+                oscillator.frequency.value = 600;
+                oscillator.type = "sine";
+                gainNode.gain.setValueAtTime(0.2, audioContext.currentTime);
+                gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.3);
+            }
+
+            oscillator.start(audioContext.currentTime);
+            oscillator.stop(audioContext.currentTime + (type === "win" ? 0.3 : 0.1));
+        }
+
+        function initBoard() {
+            const board = document.getElementById("board");
+            board.innerHTML = "";
+            moveHistory = [];
+            winningLine = null;
+            isGameOver = false;
+            updateMoveList();
+            for (let r = 0; r < BOARD_SIZE; r++) {
+                for (let c = 0; c < BOARD_SIZE; c++) {
+                    const cell = document.createElement("div");
+                    cell.className = "cell";
+                    cell.dataset.row = r;
+                    cell.dataset.col = c;
+                    cell.onclick = () => sendMove(r, c);
+                    board.appendChild(cell);
+                }
+            }
+        }
+
+        function highlightWinningLine(line) {
+            if (!line) return;
+            line.forEach(([r, c]) => {
+                const cell = document.querySelector(`.cell[data-row="${r}"][data-col="${c}"]`);
+                if (cell) {
+                    cell.classList.add("winning");
+                }
+            });
+        }
+
+        function updateMoveList() {
+            const list = document.getElementById("moveList");
+            if (moveHistory.length === 0) {
+                list.innerHTML = "<div style='text-align: center; color: #6b7280; padding: 20px;'>Chưa có nước đi nào</div>";
+                return;
+            }
+            list.innerHTML = moveHistory.map((move, idx) => {
+                const [row, col, player] = move;
+                const playerSymbol = player === 1 ? "X" : "O";
+                return `<div class="move-item" onclick="replayToMove(${idx})">${idx + 1}. ${playerSymbol} tại (${row + 1}, ${col + 1})</div>`;
+            }).join("");
+        }
+
+        function replayToMove(moveIndex) {
+            initBoard();
+            for (let i = 0; i <= moveIndex; i++) {
+                if (!moveHistory[i]) continue;
+                const [row, col, player] = moveHistory[i];
+                setTimeout(() => {
+                    const cell = document.querySelector(`.cell[data-row="${row}"][data-col="${col}"]`);
+                    if (cell) {
+                        cell.classList.add(player === 1 ? "x" : "o");
+                    }
+                }, i * 200);
+            }
+        }
+
+        function connectToRoom() {
+            const roomInput = document.getElementById("roomIdInput");
+            const statusEl = document.getElementById("status");
+            const roomId = roomInput.value.trim();
+            const token = localStorage.getItem("token");
+            const username = localStorage.getItem("username");
+
+            if (!roomId) {
+                statusEl.textContent = "Vui lòng nhập mã phòng.";
+                return;
+            }
+            if (!token || !username) {
+                window.location.href = "/login.html";
+                return;
+            }
+
+            currentRoomId = roomId;
+            document.getElementById("roomLabel").textContent = roomId;
+            statusEl.textContent = "Đang kết nối phòng " + roomId + "...";
+            initBoard();
+
+            const socket = new SockJS("/ws-caro");
+            stompClient = Stomp.over(socket);
+            stompClient.debug = null;
+
+            stompClient.connect(
+                { "Authorization": "Bearer " + token },
+                () => {
+                    isConnected = true;
+                    reconnectAttempts = 0;
+                    statusEl.textContent = "Đã kết nối, chờ phân vai...";
+                    if (reconnectTimer) {
+                        clearInterval(reconnectTimer);
+                        reconnectTimer = null;
+                    }
+
+                    const url = socket._transport && socket._transport.url;
+                    const match = url && /\/([^\/]+)\/websocket/.exec(url);
+                    const sessionId = match ? match[1] : null;
+                    currentSessionId = sessionId;
+
+                    if (!sessionId) {
+                        statusEl.textContent = "Không lấy được sessionId WebSocket.";
+                        return;
+                    }
+
+                    stompClient.subscribe("/topic/specific-user/" + sessionId, message => {
+                        const body = JSON.parse(message.body);
+                        myRole = body.role;
+
+                        if (body.currentState) {
+                            const state = body.currentState;
+                            if (state.moveHistory) {
+                                moveHistory = state.moveHistory;
+                                updateMoveList();
+                                if (moveHistory.length > 0) {
+                                    replayToMove(moveHistory.length - 1);
+                                }
+                            }
+                        }
+
+                        if (myRole === "FULL") {
+                            statusEl.textContent = "Phòng đã đầy, vui lòng chọn phòng khác.";
+                            stompClient.disconnect();
+                            stompClient = null;
+                            isConnected = false;
+                            return;
+                        }
+                        document.getElementById("roleLabel").textContent = "Vai: " + myRole;
+                        document.getElementById("btnReset").disabled = false;
+                        document.getElementById("btnSurrender").disabled = false;
+                        document.getElementById("btnDraw").disabled = false;
+                        if (myRole === "SPECTATOR") {
+                            statusEl.textContent = "Bạn đang xem phòng này.";
+                            document.getElementById("btnSurrender").disabled = true;
+                            document.getElementById("btnDraw").disabled = true;
+                        } else {
+                            statusEl.textContent = "Bạn là " + myRole + ". Chờ đủ 2 người để bắt đầu.";
+                            // Người đầu tiên vào phòng = chủ phòng
+                            if (myRole === "X") {
+                                isRoomOwner = true;
+                            }
+                        }
+                    });
+
+                    // Subscribe để nhận thông báo bị kick
+                    stompClient.subscribe("/topic/kicked/" + sessionId, message => {
+                        alert("Bạn đã bị chủ phòng đuổi khỏi phòng này.");
+                        window.location.href = "/lobby.html";
+                    });
+
+                    // Subscribe Draw Request (Cầu hòa)
+                    stompClient.subscribe("/topic/draw-request/" + sessionId, message => {
+                        const body = JSON.parse(message.body);
+                        if (confirm("Đối thủ muốn cầu hòa. Bạn có đồng ý không?")) {
+                            stompClient.send("/app/draw-response/" + body.roomId, {}, JSON.stringify({ accepted: true }));
+                        } else {
+                            stompClient.send("/app/draw-response/" + body.roomId, {}, JSON.stringify({ accepted: false }));
+                        }
+                    });
+
+                    // Subscribe Draw Response (Kết quả cầu hòa - trường hợp từ chối)
+                    stompClient.subscribe("/topic/draw-response/" + sessionId, message => {
+                        if (message.body === "REJECTED") {
+                            alert("Đối thủ đã từ chối lời cầu hòa.");
+                            document.getElementById("status").textContent = "Cầu hòa bị từ chối.";
+                        }
+                    });
+
+                    // Subscribe Rematch request (Chơi lại)
+                    stompClient.subscribe("/topic/rematch/" + roomId, message => {
+                        const body = JSON.parse(message.body);
+                        const userReady = body.username;
+
+                        // Nếu người kia ready, hiện thông báo
+                        if (userReady !== localStorage.getItem("username")) {
+                            document.getElementById("rematchArea").style.display = "block";
+                            document.getElementById("rematchStatus").textContent = "Đối thủ muốn chơi lại!";
+                            document.getElementById("status").textContent = "Đối thủ muốn chơi lại...";
+                        }
+                    });
+
+                    stompClient.subscribe("/topic/game-progress/" + roomId, message => {
+                        const state = JSON.parse(message.body);
+                        if (state.player === "RESET") {
+                            initBoard();
+                            isGameOver = false;
+                            document.getElementById("rematchArea").style.display = "none";
+                            document.getElementById("timerDisplay").style.display = "none";
+                            if (timerInterval) {
+                                clearInterval(timerInterval);
+                                timerInterval = null;
+                            }
+                            statusEl.textContent = "Ván mới bắt đầu!";
+                            return;
+                        }
+
+                        // Xử lý timer
+                        if (state.timeRemaining !== undefined && state.timeRemaining !== null) {
+                            updateTimer(state.timeRemaining);
+                        }
+
+                        // Xử lý nước đi
+                        if (state.row !== undefined && state.col !== undefined && state.row !== null && state.col !== null && state.player) {
+                            const sel = `.cell[data-row="${state.row}"][data-col="${state.col}"]`;
+                            const cell = document.querySelector(sel);
+                            if (cell && !cell.classList.contains("x") && !cell.classList.contains("o")) {
+                                cell.classList.add(state.player.toLowerCase());
+                                moveHistory.push([state.row, state.col, state.player === "X" ? 1 : 2]);
+                                updateMoveList();
+                                playSound("click");
+                            }
+                        }
+
+                        // Xử lý kết thúc ván
+                        if (state.winner) {
+                            isGameOver = true;
+                            const isWinner = state.winner === myRole;
+
+                            if (timerInterval) {
+                                clearInterval(timerInterval);
+                                timerInterval = null;
+                            }
+                            document.getElementById("timerDisplay").style.display = "none";
+
+                            // Tuỳ theo lý do kết thúc mà hiển thị thông điệp phù hợp
+                            if (state.endReason === "OPPONENT_LEFT") {
+                                statusEl.textContent = isWinner
+                                    ? "🎉 Đối thủ đã rời phòng, bạn thắng ván này."
+                                    : "Đối thủ đã rời phòng.";
+                            } else if (state.endReason === "SURRENDER") {
+                                statusEl.textContent = isWinner
+                                    ? "🎉 Đối thủ đã đầu hàng, bạn thắng ván này."
+                                    : "Bạn đã đầu hàng.";
+                            } else if (state.endReason === "DRAW") {
+                                statusEl.textContent = "🤝 Ván đấu kết thúc với tỉ số HÒA!";
+                                playSound("click"); // Hoặc âm thanh khác
+                            } else if (state.endReason === "TIME_OUT") {
+                                statusEl.textContent = isWinner
+                                    ? "🎉 Đối thủ hết giờ, bạn thắng ván này."
+                                    : "⏰ Bạn đã hết giờ!";
+                            } else if (state.endReason === "AFK") {
+                                statusEl.textContent = isWinner
+                                    ? "🎉 Đối thủ AFK quá lâu, bạn thắng ván này."
+                                    : "😴 Bạn đã bị xử thua vì AFK quá lâu.";
+                            } else {
+                                statusEl.textContent = isWinner ? "🎉 Bạn đã thắng!" : "😢 Bạn đã thua.";
+                            }
+
+                            if (state.winningLine) {
+                                winningLine = state.winningLine;
+                                setTimeout(() => highlightWinningLine(state.winningLine), 300);
+                            }
+
+                            document.getElementById("rematchArea").style.display = "block";
+                            document.getElementById("rematchStatus").textContent = "Ván đấu kết thúc. Bấm 'Chơi lại' để bắt đầu ván mới.";
+
+                            playSound("win");
+                            setTimeout(() => {
+                                if (state.endReason === "OPPONENT_LEFT") {
+                                    alert("🎉 Đối thủ đã rời phòng, bạn thắng ván này!");
+                                } else if (state.endReason === "SURRENDER") {
+                                    alert(isWinner ? "🎉 Đối thủ đã đầu hàng, bạn thắng ván này!" : "Bạn đã đầu hàng ván này.");
+                                } else if (state.endReason === "TIME_OUT") {
+                                    alert(isWinner ? "🎉 Đối thủ hết giờ, bạn thắng ván này!" : "⏰ Bạn đã hết giờ!");
+                                } else if (state.endReason === "AFK") {
+                                    alert(isWinner ? "🎉 Đối thủ AFK quá lâu, bạn thắng ván này!" : "😴 Bạn đã bị xử thua vì AFK quá lâu.");
+                                } else {
+                                    alert(isWinner ? "🎉 Chúc mừng! Bạn đã thắng ván đấu này!" : "😢 Bạn đã thua. Hãy thử lại!");
+                                }
+                            }, 500);
+                        } else if (state.nextTurn) {
+                            if (state.nextTurn === myRole) {
+                                statusEl.textContent = "Đến lượt bạn (" + myRole + ").";
+                                document.getElementById("timerDisplay").style.display = "block";
+                            } else {
+                                statusEl.textContent = "Đến lượt đối thủ (" + state.nextTurn + ").";
+                                document.getElementById("timerDisplay").style.display = "none";
+                            }
+                        }
+                    });
+
+                    stompClient.subscribe("/topic/rematch/" + roomId, message => {
+                        const body = JSON.parse(message.body);
+                        if (body.ready) {
+                            document.getElementById("rematchStatus").textContent = body.username + " đã đồng ý chơi lại!";
+                        }
+                    });
+
+                    stompClient.subscribe("/topic/chat/" + roomId, message => {
+                        const chat = JSON.parse(message.body);
+                        appendChatMessage(chat);
+                    });
+
+                    stompClient.send("/app/join/" + roomId, {}, username);
+                },
+                (error) => {
+                    console.error("WebSocket connection error:", error);
+                    isConnected = false;
+                    handleReconnect();
+                }
+            );
+
+            // Thêm listener để detect disconnect
+            socket.onclose = () => {
+                if (isConnected) {
+                    console.log("WebSocket disconnected");
+                    isConnected = false;
+                    handleReconnect();
+                }
+            };
+        }
+
+        function sendMove(row, col) {
+            if (!stompClient || !currentRoomId || !myRole || !isConnected || isGameOver || myRole === "SPECTATOR") {
+                if (!isConnected) {
+                    document.getElementById("status").textContent = "⚠️ Mất kết nối. Đang thử kết nối lại...";
+                    handleReconnect();
+                }
+                return;
+            }
+            try {
+                stompClient.send("/app/move/" + currentRoomId, {}, JSON.stringify({ row, col }));
+            } catch (e) {
+                console.error("Error sending move:", e);
+                document.getElementById("status").textContent = "⚠️ Lỗi gửi nước đi. Đang thử kết nối lại...";
+                handleReconnect();
+            }
+        }
+
+        function resetGame() {
+            if (!stompClient || !currentRoomId || !isConnected) return;
+            stompClient.send("/app/new-game/" + currentRoomId, {}, {});
+        }
+
+        function surrender() {
+            if (!stompClient || !currentRoomId || !isConnected || myRole === "SPECTATOR") return;
+            if (confirm("Bạn có chắc muốn đầu hàng?")) {
+                stompClient.send("/app/surrender/" + currentRoomId, {}, {});
+            }
+        }
+
+        function resetGame() {
+            if (!stompClient || !currentRoomId) return;
+            // Thay vì gọi /new-game ngay, ta gọi /rematch
+            // stompClient.send("/app/new-game/" + currentRoomId, {}, {});
+            requestRematch();
+        }
+
+        function requestRematch() {
+            if (!stompClient || !currentRoomId || !isConnected) return;
+            stompClient.send("/app/rematch/" + currentRoomId, {}, {});
+            document.getElementById("status").textContent = "Đang chờ đối thủ đồng ý đánh lại...";
+            document.getElementById("btnReset").disabled = true;
+        }
+
+        // Subscribe to rematch events handled in connectToRoom code block
+        // We need to confirm where the subscription is. I'll add it if missing in the next step.
+
+
+        function sendChat() {
+            if (!stompClient || !currentRoomId || !isConnected) return;
+            const input = document.getElementById("chatInput");
+            const content = input.value.trim();
+            if (!content) return;
+            const chat = {
+                content,
+                senderName: localStorage.getItem("username") || "Ẩn danh"
+            };
+            stompClient.send("/app/chat/" + currentRoomId, {}, JSON.stringify(chat));
+            input.value = "";
+        }
+
+        function handleChatKey(e) {
+            if (e.key === "Enter") sendChat();
+        }
+
+        function updateTimer(seconds) {
+            const timerEl = document.getElementById("timerDisplay");
+            if (!timerEl) return;
+
+            timerEl.style.display = "block";
+            timerEl.textContent = `⏱️ ${seconds}s`;
+
+            if (seconds <= 10) {
+                timerEl.classList.add("warning");
+            } else {
+                timerEl.classList.remove("warning");
+            }
+
+            if (seconds <= 0) {
+                timerEl.textContent = "⏰ Hết giờ!";
+            }
+        }
+
+        function kickSpectator(spectatorSessionId) {
+            if (!stompClient || !currentRoomId || !isConnected || !isRoomOwner) return;
+            if (confirm("Bạn có chắc muốn đuổi người này khỏi phòng?")) {
+                stompClient.send("/app/kick/" + currentRoomId, {}, JSON.stringify({ spectatorSessionId }));
+            }
+        }
+
+        function appendChatMessage(chat) {
+            const box = document.getElementById("chatBox");
+            const me = localStorage.getItem("username");
+            const div = document.createElement("div");
+            div.className = "chat-message " + (chat.senderName === me ? "me" : "other");
+            div.innerHTML = `<div class="chat-meta">${chat.senderName}</div><div>${chat.content}</div>`;
+            box.appendChild(div);
+            box.scrollTop = box.scrollHeight;
+        }
+
+        initBoard();
+        applyBoardTheme();
+
+        let hasAutoJoined = false;
+        (function autoJoinFromQuery() {
+            if (hasAutoJoined) return;
+            const params = new URLSearchParams(window.location.search);
+            const room = params.get("room");
+            if (room) {
+                hasAutoJoined = true;
+                const decodedRoom = decodeURIComponent(room);
+                document.getElementById("roomIdInput").value = decodedRoom;
+                document.getElementById("status").textContent = "Đang tự động vào phòng " + decodedRoom + "...";
+                setTimeout(() => connectToRoom(), 300);
+            }
+        })();
+
+        function leaveRoom() {
+            if (confirm("Bạn có chắc chắn muốn rời phòng? Nếu đang chơi bạn sẽ bị xử thua.")) {
+                if (stompClient) {
+                    stompClient.disconnect();
+                }
+                window.location.href = "/lobby.html";
+            }
+        }
+
+        function requestDraw() {
+            if (!stompClient || !currentRoomId || !isConnected) return;
+            if (document.getElementById("btnDraw").disabled) return;
+
+            if (confirm("Bạn muốn gửi yêu cầu cầu hòa?")) {
+                stompClient.send("/app/draw-request/" + currentRoomId, {}, {});
+                document.getElementById("status").textContent = "Đã gửi yêu cầu cầu hòa...";
+            }
+        }
+
+        window.logout = logout;
+        window.openLeaderboard = openLeaderboard;
+        window.closeLeaderboard = closeLeaderboard;
+        window.connectToRoom = connectToRoom;
+        window.resetGame = resetGame;
+        window.surrender = surrender;
+        window.requestRematch = requestRematch;
+        window.sendChat = sendChat;
+        window.handleChatKey = handleChatKey;
+        window.replayToMove = replayToMove;
+        window.openSettings = openSettings;
+        window.closeSettings = closeSettings;
+        window.toggleSound = toggleSound;
+        window.changeBoardTheme = changeBoardTheme;
+        window.kickSpectator = kickSpectator;
+        window.leaveRoom = leaveRoom;
+        window.requestDraw = requestDraw;
+    </script>
+</body>
+
+</html>

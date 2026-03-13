@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cờ Caro Online Pro - Trang chủ</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+        .hero {
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+            color: white;
+            padding: 20px;
+        }
+        .hero h1 {
+            font-size: 64px;
+            margin-bottom: 20px;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+        }
+        .hero p {
+            font-size: 24px;
+            margin-bottom: 40px;
+            opacity: 0.9;
+        }
+        .btn {
+            padding: 15px 40px;
+            border: none;
+            border-radius: 50px;
+            cursor: pointer;
+            font-weight: bold;
+            font-size: 18px;
+            transition: all 0.3s;
+            text-decoration: none;
+            display: inline-block;
+            margin: 10px;
+        }
+        .btn-primary {
+            background: white;
+            color: #667eea;
+        }
+        .btn-primary:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+        }
+        .btn-secondary {
+            background: transparent;
+            color: white;
+            border: 2px solid white;
+        }
+        .btn-secondary:hover {
+            background: white;
+            color: #667eea;
+        }
+        .features {
+            background: rgba(255, 255, 255, 0.95);
+            padding: 80px 20px;
+        }
+        .features-container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        .features-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 40px;
+            margin-top: 60px;
+        }
+        .feature-card {
+            text-align: center;
+            padding: 30px;
+        }
+        .feature-icon {
+            font-size: 64px;
+            margin-bottom: 20px;
+        }
+        .feature-card h3 {
+            font-size: 24px;
+            color: #333;
+            margin-bottom: 15px;
+        }
+        .feature-card p {
+            color: #666;
+            font-size: 16px;
+            line-height: 1.6;
+        }
+        .section-title {
+            text-align: center;
+            font-size: 48px;
+            color: #333;
+            margin-bottom: 20px;
+        }
+        .section-subtitle {
+            text-align: center;
+            font-size: 20px;
+            color: #666;
+        }
+        footer {
+            background: rgba(0, 0, 0, 0.3);
+            color: white;
+            text-align: center;
+            padding: 30px;
+        }
+        @media (max-width: 768px) {
+            .hero h1 {
+                font-size: 36px;
+            }
+            .hero p {
+                font-size: 18px;
+            }
+            .features-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="hero">
+        <h1>🎮 Cờ Caro Online Pro</h1>
+        <p>Thách đấu bạn bè, rèn luyện kỹ năng, trở thành cao thủ!</p>
+        <div>
+            <a href="/login.html" class="btn btn-primary">Bắt đầu chơi ngay</a>
+            <a href="/login.html" class="btn btn-secondary">Đăng nhập</a>
+        </div>
+    </div>
+
+    <div class="features">
+        <div class="features-container">
+            <h2 class="section-title">Tính năng nổi bật</h2>
+            <p class="section-subtitle">Trải nghiệm game cờ caro online chuyên nghiệp</p>
+            <div class="features-grid">
+                <div class="feature-card">
+                    <div class="feature-icon">⚡</div>
+                    <h3>Chơi realtime</h3>
+                    <p>Kết nối WebSocket tốc độ cao, chơi mượt mà không lag</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">🏆</div>
+                    <h3>Bảng xếp hạng</h3>
+                    <p>Hệ thống ELO, cạnh tranh với người chơi khác</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">👥</div>
+                    <h3>Lobby phòng</h3>
+                    <p>Tạo phòng hoặc tham gia phòng có sẵn dễ dàng</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">💬</div>
+                    <h3>Chat trong game</h3>
+                    <p>Trò chuyện với đối thủ trong khi chơi</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">📊</div>
+                    <h3>Thống kê chi tiết</h3>
+                    <p>Xem lịch sử đấu, tỷ lệ thắng, điểm số</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">🔒</div>
+                    <h3>Bảo mật cao</h3>
+                    <p>JWT authentication, mã hóa mật khẩu BCrypt</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <footer>
+        <p>&copy; 2024 Cờ Caro Online Pro. Built with Spring Boot & WebSocket.</p>
+    </footer>
+</body>
+</html>
+
